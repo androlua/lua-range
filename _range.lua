@@ -73,7 +73,9 @@ end
 
 
 function _mt:get (i)
-  return (i - 1) * self.step + self.start
+  if 1 <= i and i <= self.len then
+    return (i - 1) * self.step + self.start
+  end
 end
 
 
@@ -111,8 +113,9 @@ end
 
 local function _next (self, i)
   i = i + 1  -- next index
-  if 1 <= i and i <= self.len then
-    return i, self:get(i)
+  local v = self:get(i)
+  if v then
+    return i, v
   end
 end
 
