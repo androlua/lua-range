@@ -86,7 +86,7 @@ function _M.bless (self)
     error("single field 'stop' must be positive")
   end
   if not self.start then self.start = 1 end
-  self.step = self.start <= self.stop and 1 or -1
+  if not self.step then self.step = self.start <= self.stop and 1 or -1 end
   self.len = _len(self.start, self.stop, self.step)
   return setmetatable(self, _mt)
 end
