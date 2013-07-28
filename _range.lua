@@ -1,12 +1,11 @@
 local _M = {
   _AUTHORS = "benpop",
-  _VERSION = "1.0",
+  _VERSION = "1.1",
   _DESCRIPTION = "range generator (cf. Python (x)range, Ruby \"..\" operator)",
-  _TYPENAME = "generator.range",
 }
 
 
-local _metatable = {}
+local _mt = {}  -- metatable
 
 
 local function toint (x)
@@ -25,39 +24,54 @@ local function toint (x)
 end
 
 
+-- see Python-2.7.3/Objects/rangeobject.c:19:5
+local function _len (lo, hi, step)
+  if step > 0 and lo <= hi then
+    return 1 + (hi - lo) / step
+  elseif step < 0 and lo >= hi then
+    return 1 + (lo - hi) / -step
+  else
+    return 0
+  end
+end
+
+
+local BAD_RANGE_ARGS = "'range' needs 1-3 integer arguments"
+
+
 function _M.new (a, b, c)
-  a = assert(toint(a), "bad argument #1 to 'range.new' (expected integer)")
+  a = assert(toint(a), BAD_RANGE_ARGS)
   if b then
-    b = assert(toint(b), "bad argument #2 to 'range.new' (expected integer)")
+    b = assert(toint(b), BAD_RANGE_ARGS)
   end
   if c then
-    c = assert(toint(c), "bad argument #3 to 'range.new' (expected integer)")
-    assert(b, "bad argument #2 to 'range.new' (missing \"stop\" argument)")
-    assert(c ~= 0,
-      "bad argument #3 to 'range.new' (\"step\" argument must not be zero)")
+    c = assert(b and toint(c), BAD_RANGE_ARGS)
+    assert(c ~= 0, "'step' argument must not be zero")
   end
-  local self = {start=0, stop=0, step=0, cursor=0}
+  if not b then
+    assert(a >= 1, "single argument 'stop' must be positive")
+  end
+  local lo, hi, step
   if b then
-    self.start = a
-    self.stop = b
+    lo = a
+    hi = b
     if c then
-      self.step = c
-    elseif self.start <= self.stop then
-      self.step = 1
+      step = c
+    elseif lo <= hi then
+      step = 1
     else
-      self.step = -1
+      step = -1
     end
   else
-    self.start = 1
-    self.stop = a
-    if self.start <= self.stop then
-      self.step = 1
+    lo = 1
+    hi = a
+    if lo <= hi then
+      step = 1
     else
-      self.step = -1
+      step = -1
     end
   end
-  self.cursor = self.start
-  return setmetatable(self, _metatable)
+  return setmetatable({start=lo, step=step, len=_len(lo, hi, step)}, _mt)
 end
 
 
@@ -66,61 +80,59 @@ function _M:__call (a, b, c)
 end
 
 
-function _M:tostring ()
-  return string.format("range(%d, %d, %d)", self.start, self.stop, self.step)
+function _mt:get (i)
+  return (i - 1) * self.step + self.start
 end
 
 
-function _M:reset ()
-  self.cursor = self.start
-  return self
+function _mt:stop ()
+  return self:get(self.len)
 end
 
 
-function _M:peek ()
-  if self:cursorInBounds() then
-    return self.cursor
-  end
-end
-
-
-function _M:cursorInBounds ()
-  if self.step > 0 then
-    return self.cursor <= self.stop
+function _mt:__tostring ()
+  local lo, hi, step = self.start, self:stop(), self.step
+  if lo == 1 and step == 1 then
+    return string.format("range(%d)", hi)
+  elseif (step == 1 and lo <= hi) or (step == -1 and lo >= hi) then
+    return string.format("range(%d, %d)", lo, hi)
   else
-    return self.cursor >= self.stop
+    return string.format("range(%d, %d, %d)", lo, hi, step)
   end
 end
 
 
-function _M:next ()
-  local cursor = self.cursor
-  local retval
-  if self:cursorInBounds() then
-    retval = cursor
-  end
-  self.cursor = cursor + self.step
-  return retval
+function _mt:__len ()
+  return self.len
 end
 
 
-function _M:iter (reset)
-  if reset then self:reset() end
-  return self.next, self, nil
-end
-
-
-function _M:type ()
-  if type(self) == "table" and self.start and self.stop and
-      self.step and self.cursor then
-    return self._TYPENAME
+function _mt:__index (k)
+  local i = tonumber(k)
+  if i then
+    return self:get(i)
+  else
+    return _mt[k]
   end
 end
 
 
-_metatable.__index = _M
-_metatable.__call = _M.iter
-_metatable.__tostring = _M.tostring
+local function _next (self, i)
+  i = i + 1  -- next index
+  if 1 <= i and i <= self.len then
+    return i, self:get(i)
+  end
+end
+
+
+function _mt:__ipairs ()
+  return _next, self, 0
+end
+
+
+function _mt:type ()
+  return "range"
+end
 
 
 return setmetatable(_M, _M)
