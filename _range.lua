@@ -40,7 +40,7 @@ local function checkint (name, argn, ...)
   local arg = select(argn, ...)
   return toint(arg) or
       error(string.format(
-          "bad argument #%d to 'range': '%s' (expected integer, got %s)",
+          "bad argument #%d: '%s' (expected integer, got %s)",
           argn, name, type(arg)), 2)
 end
 
@@ -61,7 +61,7 @@ function _M.new (...)
     hi = checkint("stop", 2, ...)
     step = checkint("step", 3, ...)
   else
-    error("'range' needs 1-3 arguments")
+    error("needs 1-3 arguments")
   end
   return setmetatable({
         start = lo,
