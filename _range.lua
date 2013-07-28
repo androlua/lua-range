@@ -1,14 +1,14 @@
 local _M = {
   _AUTHORS = "benpop",
   _VERSION = "1.2",
-  _DESCRIPTION = "range generator (cf. Python (x)range, Ruby \"..\" operator)",
+  _DESCRIPTION = "range generator (cf. Python (x)range, Ruby \"..\" operator)"
 }
 
 
 local _mt = {}  -- metatable
 
 
--- see Python-2.7.3/Objects/rangeobject.c:19:5
+-- see Python-2.7.3/Objects/rangeobject.c:19
 local function _len (lo, hi, step)
   if step > 0 and lo <= hi then
     return 1 + (hi - lo) / step
@@ -40,7 +40,7 @@ local function checkint (name, argn, ...)
   local arg = select(argn, ...)
   return toint(arg) or
       error(string.format(
-          "bad argument #%d: '%s' (got %s, expected integer)",
+          "bad argument #%d to 'range': '%s' (expected integer, got %s)",
           argn, name, type(arg)), 2)
 end
 
