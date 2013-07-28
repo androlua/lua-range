@@ -1,4 +1,4 @@
-Python-like (x)range object for Lua.
+Python-like range object for Lua.
 
 Has similar semantics to Python's (x)range:
 
