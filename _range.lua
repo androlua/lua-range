@@ -72,6 +72,26 @@ function _M.new (...)
 end
 
 
+function _M.bless (self)
+  if type(self) ~= "table" then
+    return nil, "not a table"
+  elseif not self.stop then
+    return nil, "no valid fields"
+  end
+  if getmetatable(self) == _mt and self.start and self.stop and
+      self.step and self.len then
+    return self
+  end
+  if not self.start and self.stop < 0 then
+    error("single field 'stop' must be positive")
+  end
+  if not self.start then self.start = 1 end
+  self.step = self.start <= self.stop and 1 or -1
+  self.len = _len(self.start, self.stop, self.step)
+  return setmetatable(self, _mt)
+end
+
+
 function _M:__call (...)
   return self.new(...)
 end
