@@ -10,13 +10,15 @@ local _mt = {}  -- metatable
 
 -- see Python-2.7.3/Objects/rangeobject.c:19
 local function _len (lo, hi, step)
+  local n
   if step > 0 and lo <= hi then
-    return 1 + (hi - lo) / step
+    n = 1 + (hi - lo) / step
   elseif step < 0 and lo >= hi then
-    return 1 + (lo - hi) / -step
+    n = 1 + (lo - hi) / -step
   else
-    return 0
+    n = 0
   end
+  return math.floor(n)
 end
 
 
