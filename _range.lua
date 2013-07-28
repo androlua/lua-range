@@ -144,5 +144,14 @@ function _mt:__ipairs ()
 end
 
 
+function _mt:totable ()
+  local t = {}
+  for i,v in ipairs(self) do
+    t[i] = v
+  end
+  return t
+end
+
+
 return setmetatable(_M, _M)
 
