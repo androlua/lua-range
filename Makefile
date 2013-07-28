@@ -20,9 +20,7 @@ CVERSION ?= -ansi -pedantic
 CWARN ?= -Wall -Wextra
 CFLAGS = $(COPT) $(CVERSION) $(CWARN) -I$(LUADIR) -fPIC $(MYFLAGS)
 
-TARG = range.so
-
-all: $(TARG)
+all: range.so
 
 clean:
 	$(RM) *.o *.so
