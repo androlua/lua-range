@@ -3,8 +3,8 @@
 
 
 #define AUTHORS "benpop"
-#define VERSION "1.0"
-#define DESC "range generator (cf. Python (x)range, Ruby \"..\" operator)"
+#define VERSION "1.1"
+#define DESCRIPTION "range generator (based on Python xrange)"
 
 
 #define RANGE_NAME "range"
@@ -12,164 +12,182 @@
 
 
 typedef struct Range {
-  int start, stop, step;
-  int cursor;
+  lua_Integer start;
+  lua_Integer step;
+#if 0
+  lua_Integer stop;
+#endif
+  lua_Integer len;
 } Range;
 
 
-#define toRange(L) ((Range *)luaL_checkudata(L, 1, RANGE_TYPE))
+#define toRange(L) luaL_checkudata(L, 1, RANGE_TYPE)
 
-#define testRange(L) ((Range *)luaL_testudata(L, 1, RANGE_TYPE))
+#define getItem(r,i) (((i) - 1) * (r)->step + (r)->start)
+
+#define getStop(r) getItem((r), (r)->len)
 
 
-static int r_new (lua_State *L) {
-  Range *rng;
-  int a, b, c;
-  int hasB, hasC;
-  a = luaL_checkint(L, 1);
-  if ((hasB = !lua_isnoneornil(L, 2)))
-    b = luaL_checkint(L, 2);
-  if ((hasC = !lua_isnoneornil(L, 3))) {
-    c = luaL_checkint(L, 3);
-    luaL_argcheck(L, hasB, 2, "missing \"stop\" argument");
-    luaL_argcheck(L, c != 0, 3, "\"step\" argument must not be zero");
+/* see Python-2.7.3/Objects/rangeobject.c:19:5 */
+static size_t range_len (lua_Integer lo, lua_Integer hi,
+                         lua_Integer step) {
+  if (step > 0 && lo <= hi)
+    return (size_t)1 + (hi - lo) / step;
+  else if (step < 0 && lo >= hi)
+    return (size_t)1 + (lo - hi) / ((size_t)0 - step);
+  else
+    return 0;
+}
+
+
+static int range_new (lua_State *L) {
+  Range *r;
+  size_t n;
+  lua_Integer lo, hi, step = 0;
+  switch (lua_gettop(L)) {
+    case 1:
+      hi = luaL_checkinteger(L, 1);
+      luaL_argcheck(L, hi >= 1, 1, "single-argument \"stop\" must be positive");
+      lo = 1;
+      break;
+    case 2:
+      lo = luaL_checkinteger(L, 1);
+      hi = luaL_checkinteger(L, 2);
+      break;
+    case 3:
+      lo = luaL_checkinteger(L, 1);
+      hi = luaL_checkinteger(L, 2);
+      step = luaL_checkinteger(L, 3);
+      luaL_argcheck(L, step != 0, 3, "\"step\" must not be zero");
+      break;
+    default:
+      return luaL_error(L, LUA_QL(RANGE_NAME) " needs 1-3 arguments");
   }
-  rng = (Range *)lua_newuserdata(L, sizeof *rng);
+  if (step == 0)
+    step = hi >= lo ? 1 : -1;
+  n = range_len(lo, hi, step);
+  /* XXX: LONG_MAX assumed for ptrdiff_t <= lua_Integer */
+  if (n > (size_t)LONG_MAX)
+    return luaL_error(L, LUA_QL(RANGE_NAME) " result has too many items");
+  r = lua_newuserdata(L, sizeof *r);
   luaL_setmetatable(L, RANGE_TYPE);
-  if (hasB) {
-    rng->start = a;
-    rng->stop = b;
-    rng->step = hasC ? c : (rng->start <= rng->stop ? 1 : -1);
-  }
-  else {
-    rng->start = 1;
-    rng->stop = a;
-    rng->step = 1;
-  }
-  rng->cursor = rng->start;
+  r->start = lo;
+  r->step = step;
+  r->len = (lua_Integer)n;
+#if 0
+  if (n != 0)
+    r->stop = (r->len - 1) * step + lo;
+#endif
   return 1;
 }
 
 
 static int tostring (lua_State *L) {
-  Range *rng = toRange(L);
-  lua_pushfstring(L, "%s(%d, %d, %d)", RANGE_NAME, rng->start, rng->stop, rng->step);
-  return 1;
-}
-
-
-static int reset (lua_State *L) {
-  Range *rng = toRange(L);
-  rng->cursor = rng->start;
+  const Range *r = toRange(L);
+  const lua_Integer stop = getStop(r);
+  if (r->start == 1 && r->step == 1)
+    lua_pushfstring(L, RANGE_NAME "(%d)", stop);
+  else if ((r->step == 1 && r->start <= stop)
+           || (r->step == -1 && r->start >= stop))
+    lua_pushfstring(L, RANGE_NAME "(%d, %d)", r->start, stop);
+  else
+    lua_pushfstring(L, RANGE_NAME "(%d, %d, %d)", r->start, stop, r->step);
   return 1;
 }
 
 
 static int start (lua_State *L) {
-  Range *rng = toRange(L);
-  lua_pushinteger(L, rng->start);
+  const Range *r = toRange(L);
+  lua_pushinteger(L, r->start);
   return 1;
 }
 
 
 static int stop (lua_State *L) {
-  Range *rng = toRange(L);
-  lua_pushinteger(L, rng->stop);
+  const Range *r = toRange(L);
+  lua_pushinteger(L, getStop(r));
   return 1;
 }
 
 
 static int step (lua_State *L) {
-  Range *rng = toRange(L);
-  lua_pushinteger(L, rng->step);
+  const Range *r = toRange(L);
+  lua_pushinteger(L, r->step);
   return 1;
 }
 
 
-static int cursorInBounds (Range *rng) {
-  if (rng->step > 0)
-    return rng->cursor <= rng->stop;
-  else
-    return rng->cursor >= rng->stop;
+static int len (lua_State *L) {
+  const Range *r = toRange(L);
+  lua_pushinteger(L, r->len);
+  return 1;
 }
 
 
-static void pushCursor (lua_State *L, Range *rng) {
-  if (cursorInBounds(rng))
-    lua_pushinteger(L, rng->cursor);
+static void pushitem (lua_State *L, const Range *r, const lua_Integer i) {
+  if (1 <= i && i <= r->len)
+    lua_pushinteger(L, getItem(r, i));
   else
     lua_pushnil(L);
 }
 
 
-static int peek (lua_State *L) {
-  Range *rng = toRange(L);
-  pushCursor(L, rng);
+static int get (lua_State *L) {
+  const Range *r = toRange(L);
+  const lua_Integer i = luaL_checkinteger(L, 2);
+  pushitem(L, r, i);
   return 1;
 }
 
 
 static int next (lua_State *L) {
-  Range *rng = toRange(L);
-  pushCursor(L, rng);
-  rng->cursor += rng->step;
-  return 1;
+  const Range *r = toRange(L);
+  const lua_Integer i = luaL_checkinteger(L, 2) + 1;
+  lua_pushinteger(L, i);  /* next index */
+  pushitem(L, r, i);
+  return lua_isnil(L, -1) ? 1 : 2;
 }
 
 
-/*
-** rng([resetBeforeIterating?])
-** rng:iter([resetBeforeIterating?])
-**
-** reset before iterating? : default false
-**
-** Return iterator function that iterates through all the elements
-** of the range, starting at the current state of the range by default.
-*/
 static int iter (lua_State *L) {
-  Range *rng = toRange(L);
-  if (lua_toboolean(L, 2))  /* reset before iterating? */
-    rng->cursor = rng->start;
+  (void)toRange(L);
   lua_pushcfunction(L, next);
   lua_pushvalue(L, 1);  /* range object */
-  lua_pushnil(L);  /* dummy initial key */
+  lua_pushinteger(L, 0);  /* initial key */
   return 3;
 }
 
 
-static int remaining (lua_State *L) {
-  Range *rng = toRange(L);
-  if (cursorInBounds(rng)) {
-    int nelems = (rng->stop - rng->start) / rng->cursor;
-    lua_pushinteger(L, nelems);
+static int index (lua_State *L) {
+  const Range *r = toRange(L);
+  int isnum;
+  const lua_Integer i = lua_tointegerx(L, 2, &isnum);
+  if (isnum)
+    pushitem(L, r, i);
+  else {  /* try method name */
+    const char *name = luaL_checkstring(L, 2);
+    lua_rawget(L, lua_upvalueindex(1));  /* Methods.method */
+    if (lua_isnil(L, -1))
+      return luaL_error(L, "invalid method name: " LUA_QS, name);
   }
-  else lua_pushinteger(L, 0);
   return 1;
 }
 
 
-static int size (lua_State *L) {
-  Range *rng = toRange(L);
-  int diff = rng->stop - rng->start;
-  int rem = diff % rng->step;
-  int nelems = (rng->stop - rng->start) / rng->step;
-  lua_pushinteger(L, nelems);
+static int totable (lua_State *L) {
+  const Range *r = toRange(L);
+  lua_Integer i;
+  lua_createtable(L, r->len, 0);
+  for (i = 1; i <= r->len; i++) {
+    lua_pushinteger(L, getItem(r, i));
+    lua_rawseti(L, -2, i);
+  }
   return 1;
 }
 
 
-static int type (lua_State *L) {
-  Range *rng = testRange(L);
-  if (rng != NULL)
-    lua_pushliteral(L, RANGE_TYPE);
-  else
-    lua_pushnil(L);
-  return 1;
-}
-
-
-static int libCallNew (lua_State *L) {
-  lua_pushcfunction(L, r_new);
+static int lib_call_new (lua_State *L) {
+  lua_pushcfunction(L, range_new);
   lua_replace(L, 1);  /* put "new" function under args (replacing lib table) */
   lua_call(L, lua_gettop(L)-1, 1);
   return 1;
@@ -177,74 +195,63 @@ static int libCallNew (lua_State *L) {
 
 
 static const luaL_Reg Lib[] = {
-  {"new", r_new},
-  {"tostring", tostring},
-  {"type", type},
-  {"reset", reset},
-  {"peek", peek},
-  {"next", next},
-  {"iter", iter},
-  {"start", start},
-  {"stop", stop},
-  {"step", step},
-  {"size", size},
-  {"remaining", remaining},
+  {"new", range_new},
+  {"__call", lib_call_new},
   {NULL, NULL}
 };
 
 
 static const luaL_Reg Meta[] = {
+  {"totable", totable},
+  {"start", start},
+  {"stop", stop},
+  {"step", step},
+  {"get", get},
   {"__tostring", tostring},
   {"__call", iter},
-  {"__len", size},
-#ifdef TM_ITER
-  {"__iter", iter},
-#endif
-#ifdef TM_NEXT
-  {"__next", next},
-#endif
+  {"__ipairs", iter},
+  {"__len", len},
   {NULL, NULL}
 };
 
 
-static const luaL_Reg LibMeta[] = {
-  {"__call", libCallNew},
-  {NULL, NULL}
-};
+#define setField(field) \
+  lua_pushliteral(L, field); \
+  lua_setfield(L, -2, "_" #field)
 
 
-static void createRangeMetaTable (lua_State *L) {
-  luaL_newmetatable(L, RANGE_TYPE);
-  luaL_setfuncs(L, Meta, 0);
-  lua_pushvalue(L, -2);  /* Lib table */
-  lua_setfield(L, -2, "__index");
-  lua_pop(L, 1);  /* pop metatable */
+#if 0
+static void setLibMetaData (lua_State *L) {
+  lua_pushliteral(L, AUTHORS);
+  lua_setfield(L, -2, "_AUTHORS");
+  lua_pushliteral(L, VERSION);
+  lua_setfield(L, -2, "_VERSION");
+  lua_pushliteral(L, DESCRIPTION);
+  lua_setfield(L, -2, "_DESCRIPTION");
 }
+#endif
 
 
-static void setLibMetaTable (lua_State *L) {
-  luaL_newlib(L, LibMeta);
+static void ownMetaTable (lua_State *L) {
+  lua_pushvalue(L, -1);
   lua_setmetatable(L, -2);
 }
 
 
-static void setLibMetaData (lua_State *L) {
-  lua_pushliteral(L, AUTHORS);
-  lua_setfield(L, -2, "_AUTHOR");
-  lua_pushliteral(L, VERSION);
-  lua_setfield(L, -2, "_VERSION");
-  lua_pushliteral(L, DESC);
-  lua_setfield(L, -2, "_DESCRIPTION");
-  lua_pushliteral(L, RANGE_TYPE);
-  lua_setfield(L, -2, "_TYPENAME");
-}
-
-
 int luaopen_range (lua_State *L) {
+  /* Range type metatable */
+  luaL_newmetatable(L, RANGE_TYPE);
+  luaL_setfuncs(L, Meta, 0);
+  ownMetaTable(L);
+  lua_pushvalue(L, -1);
+  lua_pushcclosure(L, index, 1);  /* enclose metatable in index function */
+  lua_setfield(L, -2, "__index");
+  /* Range library module */
   luaL_newlib(L, Lib);
-  setLibMetaTable(L);
-  setLibMetaData(L);
-  createRangeMetaTable(L);
+  setField(AUTHORS);
+  setField(VERSION);
+  setField(DESCRIPTION);
+  ownMetaTable(L);
   return 1;
 }
 
