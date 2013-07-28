@@ -108,7 +108,7 @@ function _mt:__tostring ()
   if self.start == 1 and self.step == 1 then
     return string.format("range(%d)", self.stop)
   elseif (self.step == 1 and self.start <= self.stop) or
-         (self.step == -1 and self.start >= self.stop) then
+      (self.step == -1 and self.start >= self.stop) then
     return string.format("range(%d, %d)", self.start, self.stop)
   else
     return string.format("range(%d, %d, %d)",
@@ -135,9 +135,7 @@ end
 local function _next (self, i)
   i = i + 1  -- next index
   local v = self:get(i)
-  if v then
-    return i, v
-  end
+  if v then return i, v end
 end
 
 
