@@ -63,7 +63,12 @@ function _M.new (...)
   else
     error("'range' needs 1-3 arguments")
   end
-  return setmetatable({start=lo, step=step, len=_len(lo, hi, step)}, _mt)
+  return setmetatable({
+        start = lo,
+        stop = hi,
+        step = step,
+        len = _len(lo, hi, step)
+      }, _mt)
 end
 
 
@@ -79,19 +84,15 @@ function _mt:get (i)
 end
 
 
-function _mt:stop ()
-  return self:get(self.len)
-end
-
-
 function _mt:__tostring ()
-  local lo, hi, step = self.start, self:stop(), self.step
-  if lo == 1 and step == 1 then
-    return string.format("range(%d)", hi)
-  elseif (step == 1 and lo <= hi) or (step == -1 and lo >= hi) then
-    return string.format("range(%d, %d)", lo, hi)
+  if self.start == 1 and self.step == 1 then
+    return string.format("range(%d)", self.stop)
+  elseif (self.step == 1 and self.start <= self.stop) or
+         (self.step == -1 and self.start >= self.stop) then
+    return string.format("range(%d, %d)", self.start, self.stop)
   else
-    return string.format("range(%d, %d, %d)", lo, hi, step)
+    return string.format("range(%d, %d, %d)",
+        self.start, self.stop, self.step)
   end
 end
 
