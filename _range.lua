@@ -126,10 +126,5 @@ function _mt:__ipairs ()
 end
 
 
-function _mt:type ()
-  return "range"
-end
-
-
 return setmetatable(_M, _M)
 
