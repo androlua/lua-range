@@ -1,11 +1,23 @@
 local _M = {
   _AUTHORS = "benpop",
-  _VERSION = "1.1",
+  _VERSION = "1.2",
   _DESCRIPTION = "range generator (cf. Python (x)range, Ruby \"..\" operator)",
 }
 
 
 local _mt = {}  -- metatable
+
+
+-- see Python-2.7.3/Objects/rangeobject.c:19:5
+local function _len (lo, hi, step)
+  if step > 0 and lo <= hi then
+    return 1 + (hi - lo) / step
+  elseif step < 0 and lo >= hi then
+    return 1 + (lo - hi) / -step
+  else
+    return 0
+  end
+end
 
 
 local function toint (x)
@@ -24,59 +36,39 @@ local function toint (x)
 end
 
 
--- see Python-2.7.3/Objects/rangeobject.c:19:5
-local function _len (lo, hi, step)
-  if step > 0 and lo <= hi then
-    return 1 + (hi - lo) / step
-  elseif step < 0 and lo >= hi then
-    return 1 + (lo - hi) / -step
-  else
-    return 0
-  end
+local function checkint (name, argn, ...)
+  local arg = select(argn, ...)
+  return toint(arg) or
+      error(string.format(
+          "bad argument #%d: '%s' (got %s, expected integer)",
+          argn, name, type(arg)), 2)
 end
 
 
-local BAD_RANGE_ARGS = "'range' needs 1-3 integer arguments"
-
-
-function _M.new (a, b, c)
-  a = assert(toint(a), BAD_RANGE_ARGS)
-  if b then
-    b = assert(toint(b), BAD_RANGE_ARGS)
-  end
-  if c then
-    c = assert(b and toint(c), BAD_RANGE_ARGS)
-    assert(c ~= 0, "'step' argument must not be zero")
-  end
-  if not b then
-    assert(a >= 1, "single argument 'stop' must be positive")
-  end
+function _M.new (...)
+  local n = select("#", ...)
   local lo, hi, step
-  if b then
-    lo = a
-    hi = b
-    if c then
-      step = c
-    elseif lo <= hi then
-      step = 1
-    else
-      step = -1
-    end
+  if n == 1 then
+    hi = checkint("stop", 1, ...)
+    assert(hi >= 1, "single argument 'stop' must be positive")
+    lo, step = 1, 1
+  elseif n == 2 then
+    lo = checkint("start", 1, ...)
+    hi = checkint("stop", 2, ...)
+    step = lo <= hi and 1 or -1
+  elseif n == 3 then
+    lo = checkint("start", 1, ...)
+    hi = checkint("stop", 2, ...)
+    step = checkint("step", 3, ...)
   else
-    lo = 1
-    hi = a
-    if lo <= hi then
-      step = 1
-    else
-      step = -1
-    end
+    error("'range' needs 1-3 arguments")
   end
   return setmetatable({start=lo, step=step, len=_len(lo, hi, step)}, _mt)
 end
 
 
-function _M:__call (a, b, c)
-  return self.new(a, b, c)
+function _M:__call (...)
+  return self.new(...)
 end
 
 
