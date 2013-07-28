@@ -19,7 +19,6 @@ Methods:
 	#obj  -->  number of items in range
 	ipairs(obj)  -->  iterator over range
 	obj[index]  -->  same as obj:get(index)
-	obj:method(...)  -->  call one of the below methods
 
 	[Regular methods]
 	(The first three are fields in the Lua implementation.)
