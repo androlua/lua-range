@@ -208,7 +208,6 @@ static const luaL_Reg Meta[] = {
   {"step", step},
   {"get", get},
   {"__tostring", tostring},
-  {"__call", iter},
   {"__ipairs", iter},
   {"__len", len},
   {NULL, NULL}
